@@ -1,0 +1,15 @@
+".\Objects\STARTUP.obj",
+".\Objects\main.obj",
+".\Objects\my_printf.obj",
+".\Objects\bat.obj",
+".\Objects\key.obj",
+".\Objects\led.obj",
+".\Objects\sc7a20.obj",
+".\Objects\clock.obj",
+".\Objects\gpio.obj",
+".\Objects\ie.obj",
+".\Objects\wdt.obj" 
+TO ".\Objects\autoBrake" 
+PRINT(".\Listings\autoBrake.m51") RAMSIZE(256) 
+CODE( 0X0000-0X3FFF )
+XDATA( 0X0000-0X02FF )

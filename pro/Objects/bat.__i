@@ -1,0 +1,1 @@
+"..\user\bat.c" OPTIMIZE (8,SPEED) BROWSE INCDIR(..\hal;..\user) DEBUG OBJECTEXTEND PRINT(.\Listings\bat.lst) TABS (2) OBJECT(.\Objects\bat.obj)

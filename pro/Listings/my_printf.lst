@@ -1,0 +1,108 @@
+C51 COMPILER V9.55   MY_PRINTF                                                             01/11/2024 00:28:58 PAGE 1   
+
+
+C51 COMPILER V9.55, COMPILATION OF MODULE MY_PRINTF
+OBJECT MODULE PLACED IN .\Objects\my_printf.obj
+COMPILER INVOKED BY: D:\Program Files (x86)\Keil_C51\C51\BIN\C51.EXE ..\user\my_printf.c OPTIMIZE(8,SPEED) BROWSE INCDIR
+                    -(..\hal;..\user) DEBUG OBJECTEXTEND PRINT(.\Listings\my_printf.lst) TABS(2) OBJECT(.\Objects\my_printf.obj)
+
+line level    source
+
+   1          #include "my_printf.h"
+   2          #include <stdarg.h>
+   3          #include <stdio.h>
+   4          #include "HC89S003AF4.h"
+   5          #include "ie.h"
+   6          
+   7          void UART1_Init(void)
+   8          {
+   9   1          // /* 设置P2.4为推挽输出 */
+  10   1          P2M2 = P2M2 & 0xF0 | 0x08;
+  11   1          /* 映射TXD 为P24 */
+  12   1          TXD_MAP = 0x24;
+  13   1      
+  14   1          /* UART1的波特率: 00 T4 */
+  15   1          BRTSEL = 0x00;
+  16   1      
+  17   1          // P2M0 = P2M0&0x0F|0x80;             //P21设置为推挽输出
+  18   1        // TXD_MAP = 0x21;                      //TXD映射P21
+  19   1        // BRTSEL = 0X00;                                //UART1的波特率:00 T4  
+  20   1      
+  21   1      
+  22   1          /* T4工作模式：UART1波特率发生器 */
+  23   1          T4CON = 0x06;
+  24   1      
+  25   1          /* 设置波特率: 19200 */
+  26   1          TH4 = 0xFF;
+  27   1          TL4 = 0x98;
+  28   1      
+  29   1          /* 8位UART, 可变波特率 */
+  30   1          SCON2 = 0x02;
+  31   1      
+  32   1      //    user_set_interrupt_state(IE_TYPE_UART1, IE_ENABLE);
+  33   1      }
+  34           
+  35          // 发送一个字符到串口
+  36          void UART_SendChar(char ch) 
+  37          {
+  38   1          // 将字符发送到串口
+  39   1          SBUF = (uint8_t)ch;
+  40   1          while(!(SCON & 0X02));
+  41   1          SCON &=~ 0x02;/* 清除发送中断标志位 */  
+  42   1      }
+  43          
+  44          // 发送一个字符串到串口
+  45          void UART_SendString(char* str)
+  46          {
+  47   1          while (*str) {
+  48   2              UART_SendChar(*str++);
+  49   2          }
+  50   1      }
+  51          
+  52          // 自定义printf函数，仅支持格式化输出 %d 和 %s
+  53          void my_printf(const char* format, ...) 
+  54          {
+C51 COMPILER V9.55   MY_PRINTF                                                             01/11/2024 00:28:58 PAGE 2   
+
+  55   1          va_list args;
+  56   1          va_start(args, format);
+  57   1      
+  58   1          while (*format != '\0') {
+  59   2              if (*format == '%') {
+  60   3                  format++;
+  61   3                  if (*format == 'd') {
+  62   4                      int num = va_arg(args, int);
+  63   4                      // 将数字转换为字符串并发送到串口
+  64   4                      char numStr[12]; // 最多11位数字，再加上结束符
+  65   4                      sprintf(numStr, "%d", num);
+  66   4                      UART_SendString(numStr);
+  67   4                  } else if (*format == 's') {
+  68   4                      char* str = va_arg(args, char*);
+  69   4                      // 直接发送字符串到串口
+  70   4                      UART_SendString(str);
+  71   4                  }
+  72   3              } else {
+  73   3                  // 发送普通字符
+  74   3                  UART_SendChar(*format);
+  75   3              }
+  76   2              format++;
+  77   2          }
+  78   1      
+  79   1          va_end(args);
+  80   1      }
+  81          
+  82          
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    259    ----
+   CONSTANT SIZE    =      3    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----      38
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

@@ -1,0 +1,294 @@
+C51 COMPILER V9.55   BAT                                                                   01/11/2024 00:26:57 PAGE 1   
+
+
+C51 COMPILER V9.55, COMPILATION OF MODULE BAT
+OBJECT MODULE PLACED IN .\Objects\bat.obj
+COMPILER INVOKED BY: D:\Program Files (x86)\Keil_C51\C51\BIN\C51.EXE ..\user\bat.c OPTIMIZE(8,SPEED) BROWSE INCDIR(..\ha
+                    -l;..\user) DEBUG OBJECTEXTEND PRINT(.\Listings\bat.lst) TABS(2) OBJECT(.\Objects\bat.obj)
+
+line level    source
+
+   1          #include "HC89S003AF4.h"
+   2          #include "bat.h"
+   3          #include "common.h"
+   4          #include "gpio.h"
+   5          #include "led.h"
+   6          #include "my_printf.h"
+   7          
+   8          #define LVDIF_MASK          0x08
+   9          #define LVD_VDD_42          0x07
+  10          #define LVD_VDD_39          0x06
+  11          #define LVD_VDD_36          0x05
+  12          #define LVD_VDD_MASK        0x07
+  13          #define LVD_ENABLE          0x80
+  14          
+  15          static uint16_t    gBatCnt = 0;
+  16          static bat_level_t gCurLevel = BAT_LEVEL_42;
+  17          static bat_level_t gVddLevel = BAT_LEVEL_INVALID;
+  18          static uint16_t    gAdcValue = 0;
+  19          static bool_en     gAdcStart = false;
+  20          
+  21          void lvd_enable(bool_en enable)
+  22          {
+  23   1          if(enable){
+  24   2              LVDC |= bmLVDEN;
+  25   2          }else{
+  26   2              LVDC &= (~bmLVDEN);
+  27   2          }
+  28   1      }
+  29          
+  30          void lvd_clear_flag(void)
+  31          {
+  32   1          LVDC &= (~bmLVDF);
+  33   1      }
+  34          
+  35          bool lvd_get_flag(void)
+  36          {
+  37   1          return (LVDC & bmLVDF);
+  38   1      }
+  39          
+  40          void lvd_set_level(uint8_t level)
+  41          {
+  42   1          LVDC = LVDC & 0xF8 | level;
+  43   1      }
+  44          
+  45          uint8_t lvd_get_level(void)
+  46          {
+  47   1          return (bmLVDF & bmLVDV);
+  48   1      }
+  49          
+  50          /**
+  51            * @说明   延时函数
+  52            * @参数   fui_i : 延时时间
+  53            * @返回值 无
+  54            * @注    Fcpu = 16MHz,fui_i = 1时,延时时间约为2us
+C51 COMPILER V9.55   BAT                                                                   01/11/2024 00:26:57 PAGE 2   
+
+  55            */
+  56          void Delay_2us(unsigned int fui_i)
+  57          {
+  58   1        while(fui_i--); 
+  59   1      }
+  60          
+  61          void bat_init(void)
+  62          {
+  63   1          BORC = 0xC2;                          //BOR使能，BOR消抖使能，检测电压点2.4V
+  64   1        //BOR消抖时间计算
+  65   1        //消抖时间 = BORDBC[7:0] * 8Tcpu + 2Tcpu
+  66   1        //       = 255 * 8 * 0.0625us + 2 * 0.0625us
+  67   1        //       = 127.625us
+  68   1      
+  69   1        BORDBC = 0xFF;                        //BOR电压检测去抖时间127.625us
+  70   1      
+  71   1      
+  72   1          lvd_set_level(LVD_VDD_42);
+  73   1          lvd_clear_flag();
+  74   1          lvd_enable(true);
+  75   1          // LVDC = LVD_ENABLE | LVD_VDD_42;              //LVD设置
+  76   1        //  消抖时间 =  (0xFF + 2) * 1/Fcpu
+  77   1        //       =  (0xFF + 2) / 16000000 （当前的CPU时钟）
+  78   1        //       =  16.0625us
+  79   1        LVDDBC = 0xFF;            //设置消抖时间
+  80   1      
+  81   1          // gpio0_init(GPIO_1, GPIO_INPUT_ANALOG_RESERVE);
+  82   1      
+  83   1          // ADCC0 = 0x81;              //打开ADC转换电源
+  84   1          // Delay_2us(20);               //延时20us，确保ADC系统稳定
+  85   1        // ADCC1 = 0x01;              //选择外部通道1
+  86   1        // ADCC2 = 0x4D;              //转换结果12位数据，数据右对齐，ADC时钟16分频
+  87   1      }
+  88          
+  89          void check_bat_task(void)
+  90          {
+  91   1          static bool stLvdIF;
+  92   1          static uint8_t stLvdLevel;
+  93   1          static uint8_t cnt = 0;
+  94   1          if(!gMainContext.mBatDelay){
+  95   2              return;
+  96   2          }
+  97   1          gMainContext.mBatDelay = false;
+  98   1      
+  99   1      //    if(gAdcStart){
+ 100   1      //        goto wait_done;
+ 101   1      //    }
+ 102   1      
+ 103   1          gBatCnt ++;
+ 104   1          if(10 > gBatCnt){
+ 105   2              return;
+ 106   2          }
+ 107   1          gBatCnt = 0;
+ 108   1      
+ 109   1          /* check bat state per 1000ms */
+ 110   1          stLvdIF = lvd_get_flag();
+ 111   1      
+ 112   1          stLvdLevel = lvd_get_level();
+ 113   1          switch(stLvdLevel){
+ 114   2              case LVD_VDD_42:{
+ 115   3                  if(stLvdIF){
+ 116   4                      /* vdd lower than 4.2V */
+C51 COMPILER V9.55   BAT                                                                   01/11/2024 00:26:57 PAGE 3   
+
+ 117   4                      lvd_clear_flag();
+ 118   4                      cnt ++;
+ 119   4                      if(cnt >= 5){
+ 120   5                          cnt = 0;
+ 121   5                          gCurLevel = BAT_LEVEL_39;
+ 122   5                          /* check vdd whether lower than 3.9 V*/
+ 123   5                          lvd_set_level(LVD_VDD_39);
+ 124   5                      } 
+ 125   4                  }else{
+ 126   4                      /* vdd higher than 4.2V */
+ 127   4                      cnt ++;
+ 128   4                      if(cnt >= 10){
+ 129   5                          cnt = 0;
+ 130   5                          gCurLevel = BAT_LEVEL_42;
+ 131   5                      }
+ 132   4                  }
+ 133   3                  break;
+ 134   3              }
+ 135   2      
+ 136   2              case LVD_VDD_39:{
+ 137   3                  if(stLvdIF){
+ 138   4                      /* vdd lower than 3.9V */
+ 139   4                      lvd_clear_flag();
+ 140   4                      cnt ++;
+ 141   4                      if(cnt >= 5){
+ 142   5                          cnt = 0;
+ 143   5                          gCurLevel = BAT_LEVEL_36;
+ 144   5                          /* check vdd whether lower than 3.6 V*/
+ 145   5                          lvd_set_level(LVD_VDD_36);
+ 146   5                      } 
+ 147   4                  }else{
+ 148   4                      /* 3.9V < vdd < 4.2V */
+ 149   4                      cnt ++;
+ 150   4                      if(cnt >= 10){
+ 151   5                          cnt = 0;
+ 152   5                          lvd_set_level(LVD_VDD_42);
+ 153   5                          gCurLevel = BAT_LEVEL_39;
+ 154   5                      }
+ 155   4                  }
+ 156   3                  break;
+ 157   3              }
+ 158   2      
+ 159   2              case LVD_VDD_36:{
+ 160   3                  if(stLvdIF){
+ 161   4                      lvd_clear_flag();
+ 162   4                      cnt ++;
+ 163   4                      if(cnt >= 5){
+ 164   5                          cnt = 0;
+ 165   5                          gCurLevel = BAT_LEVEL_30;
+ 166   5                      } 
+ 167   4                  }else{
+ 168   4                      /* 3.6V < VDD < 3.9V */
+ 169   4                      cnt ++;
+ 170   4                      if(cnt >= 10){
+ 171   5                          cnt = 0;
+ 172   5                          lvd_set_level(LVD_VDD_39);
+ 173   5                          gCurLevel = BAT_LEVEL_36;
+ 174   5                      }
+ 175   4                  }
+ 176   3                  break;
+ 177   3              }
+ 178   2      
+C51 COMPILER V9.55   BAT                                                                   01/11/2024 00:26:57 PAGE 4   
+
+ 179   2              default:{
+ 180   3                  LVDC = LVD_VDD_42;
+ 181   3                  break;
+ 182   3              }
+ 183   2          }
+ 184   1      
+ 185   1      //     ADCC0 |= 0x40;         //启动ADC转换
+ 186   1      //     gAdcStart = true;
+ 187   1      // wait_done:  
+ 188   1      //     while(!(ADCC0&0x20)){
+ 189   1      //         //等待ADC转换结束
+ 190   1      //         return;
+ 191   1      //     }      
+ 192   1      //     ADCC0 &=~ 0x20;          //清除标志位
+ 193   1      //     gAdcValue = ADCR;            //获取ADC的值
+ 194   1      //     gAdcStart = false;
+ 195   1      
+ 196   1      //     my_printf("adc value: %d\r\n", gAdcValue);
+ 197   1      
+ 198   1      //     if(gAdcValue >= 3270){
+ 199   1      //        gCurLevel = BAT_LEVEL_42;
+ 200   1      //     }else if(gAdcValue >= 2950){
+ 201   1      //         gCurLevel = BAT_LEVEL_36;
+ 202   1      //     }else{
+ 203   1      //         gCurLevel = BAT_LEVEL_30;
+ 204   1      //     }
+ 205   1      }
+ 206          
+ 207          void bat_led_task(void)
+ 208          {
+ 209   1          static u8 ledCnt = 0;
+ 210   1      
+ 211   1          if(!gMainContext.mLedDelay){
+ 212   2              return;
+ 213   2          }
+ 214   1      
+ 215   1          gMainContext.mLedDelay = false;
+ 216   1      
+ 217   1          // if(gCurLevel == gVddLevel){
+ 218   1          //     cnt = 0;
+ 219   1          //     return;
+ 220   1          // }
+ 221   1      
+ 222   1      //    ledCnt ++;
+ 223   1      //    if(ledCnt < 250){
+ 224   1      //        return;
+ 225   1      //    }
+ 226   1      
+ 227   1      //    ledCnt = 0;
+ 228   1          // gVddLevel ++;
+ 229   1          // if(gVddLevel >= BAT_LEVEL_INVALID) gVddLevel = 0;
+ 230   1      // 
+ 231   1          gVddLevel = gCurLevel;
+ 232   1          my_printf("vdd level: %d\r\n", gVddLevel);
+ 233   1          switch(gVddLevel){
+ 234   2              case BAT_LEVEL_42:{
+ 235   3                  user_set_blue_led_state(LED_STATE_ON);
+ 236   3                  user_set_red_led_state(LED_STATE_ON);
+ 237   3                  break;
+ 238   3              }
+ 239   2      
+ 240   2              case BAT_LEVEL_39:{
+C51 COMPILER V9.55   BAT                                                                   01/11/2024 00:26:57 PAGE 5   
+
+ 241   3                  user_set_blue_led_state(LED_STATE_ON);
+ 242   3                  user_set_red_led_state(LED_STATE_OFF);
+ 243   3                  break;
+ 244   3              }
+ 245   2      
+ 246   2              case BAT_LEVEL_36:{
+ 247   3                  user_set_blue_led_state(LED_STATE_OFF);
+ 248   3                  user_set_red_led_state(LED_STATE_ON);
+ 249   3                  break;
+ 250   3              }
+ 251   2      
+ 252   2              case BAT_LEVEL_30:{
+ 253   3                  user_set_blue_led_state(LED_STATE_OFF);
+ 254   3                  user_set_red_led_state(LED_STATE_OFF);
+ 255   3                  break;
+ 256   3              }
+ 257   2      
+ 258   2              default:
+ 259   2                  break;
+ 260   2          }
+ 261   1      }
+*** WARNING C280 IN LINE 209 OF ..\user\bat.c: 'ledCnt': unreferenced local variable
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    334    ----
+   CONSTANT SIZE    =     16    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =     10    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =      1    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  1 WARNING(S),  0 ERROR(S)

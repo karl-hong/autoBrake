@@ -1,0 +1,164 @@
+C51 COMPILER V9.55   KEY                                                                   01/10/2024 01:05:56 PAGE 1   
+
+
+C51 COMPILER V9.55, COMPILATION OF MODULE KEY
+OBJECT MODULE PLACED IN .\Objects\key.obj
+COMPILER INVOKED BY: D:\Program Files (x86)\Keil_C51\C51\BIN\C51.EXE ..\user\key.c OPTIMIZE(8,SPEED) BROWSE INCDIR(..\ha
+                    -l;..\user) DEBUG OBJECTEXTEND PRINT(.\Listings\key.lst) TABS(2) OBJECT(.\Objects\key.obj)
+
+line level    source
+
+   1          #include "HC89S003AF4.h"
+   2          #include "key.h"
+   3          #include "gpio.h"
+   4          #include "common.h"
+   5          #include "led.h"
+   6          
+   7          #define KEY_MASK        0x00
+   8          #define KEY_VALUE_PWR   0x01
+   9          #define KEY_VALUE_GAP   0x02
+  10          #define KEY_VALUE_TIM   0x04
+  11          
+  12          static bool_en gKeyPress     = false;
+  13          static bool_en gKeyPressed   = false;
+  14          static bool_en gKeyLongPress = false;
+  15          static uint8_t gLastKeyValue = KEY_MASK;
+  16          static uint16_t gKeyCnt = 0;
+  17          
+  18          
+  19          static void doPowerKeyShortPressEvent(void)
+  20          {
+  21   1          static uint8_t state = 0;
+  22   1          state = !state;
+  23   1          if(state){
+  24   2              user_set_brake_led_level(LED_LEVEL_LOW);
+  25   2          }else{
+  26   2              user_set_brake_led_level(LED_LEVEL_OFF);
+  27   2          }
+  28   1      }
+  29          
+  30          static void doGapKeyShortPressEvent(void)
+  31          {
+  32   1      
+  33   1      }
+  34          
+  35          static void doTimKeyShortPressEVent(void)
+  36          {
+  37   1      
+  38   1      }
+  39          
+  40          static void doPowerKeyLongPressEvent(void)
+  41          {
+  42   1      
+  43   1      }
+  44          
+  45          static void doGapKeyLongPressEvent(void)
+  46          {
+  47   1      
+  48   1      }
+  49          
+  50          static void doTimKeyLongPressEVent(void)
+  51          {
+  52   1      
+  53   1      }
+  54          
+C51 COMPILER V9.55   KEY                                                                   01/10/2024 01:05:56 PAGE 2   
+
+  55          static void onLongKeyPressed(uint8_t keyValue)
+  56          {
+  57   1          if(KEY_VALUE_PWR & keyValue){
+  58   2              doPowerKeyLongPressEvent();
+  59   2          }else if(KEY_VALUE_GAP & keyValue){
+  60   2              doGapKeyLongPressEvent();
+  61   2          }else if(KEY_VALUE_TIM & keyValue){
+  62   2              doTimKeyLongPressEVent();
+  63   2          }
+  64   1      }
+  65          
+  66          static void onShortKeyPressed(uint8_t keyValue)
+  67          {
+  68   1          if(KEY_VALUE_PWR & keyValue){
+  69   2              doPowerKeyShortPressEvent();
+  70   2          }else if(KEY_VALUE_GAP & keyValue){
+  71   2              doGapKeyShortPressEvent();
+  72   2          }else if(KEY_VALUE_TIM & keyValue){
+  73   2             doTimKeyShortPressEVent(); 
+  74   2          }
+  75   1      }
+  76          
+  77          void key_init(void)
+  78          {
+  79   1          /* 电源键：P2.5 */
+  80   1          gpio2_init(GPIO_5, GPIO_INPUT_PU_WITH_SMT);
+  81   1      
+  82   1          /* Gsensor 阈值设置键: P0.2 */
+  83   1          gpio0_init(GPIO_2, GPIO_INPUT_PU_WITHOUT_SMT);
+  84   1      
+  85   1          /* Gsensor 滤波时间设置键: P2.3 */
+  86   1          gpio2_init(GPIO_3, GPIO_INPUT_PU_WITH_SMT);
+  87   1      }
+  88          
+  89          void key_task(void)
+  90          {
+  91   1          uint8_t stKeyValue;
+  92   1      
+  93   1          if(gMainContext.mKeyDelay == false){
+  94   2              return;
+  95   2          }
+  96   1          gMainContext.mKeyDelay = false;
+  97   1      
+  98   1          stKeyValue = P2_5;
+  99   1        stKeyValue |= (P0_2 ? 0x02 : 0x00);
+ 100   1        stKeyValue |= (P2_3 ? 0x04 : 0x00);
+ 101   1      
+ 102   1          if(KEY_MASK == stKeyValue){
+ 103   2              /* no key pressed */
+ 104   2              gKeyPress = false;
+ 105   2              return;
+ 106   2          }
+ 107   1      
+ 108   1          if(gKeyPress){
+ 109   2              /* key pressing */
+ 110   2              if(gLastKeyValue == stKeyValue){
+ 111   3                  gKeyCnt ++;
+ 112   3                  if(gKeyCnt >= 2000 && !gKeyLongPress){
+ 113   4                      gKeyLongPress = true;
+ 114   4                      onLongKeyPressed(stKeyValue);
+ 115   4                  }else if(gKeyCnt >= 30 && !gKeyPressed){
+ 116   4                      gKeyPressed = true;
+C51 COMPILER V9.55   KEY                                                                   01/10/2024 01:05:56 PAGE 3   
+
+ 117   4                  }
+ 118   3              }else{
+ 119   3                  /* release key */
+ 120   3                  if(!gKeyLongPress && gKeyPressed){
+ 121   4                      onShortKeyPressed(stKeyValue);
+ 122   4                  }
+ 123   3                  gKeyPress = false;
+ 124   3              }
+ 125   2          }else{
+ 126   2              /* key value changed */
+ 127   2              if(gLastKeyValue != stKeyValue){
+ 128   3                  gLastKeyValue = stKeyValue;
+ 129   3                  gKeyPress = true;
+ 130   3                  gKeyPressed = false;
+ 131   3                  gKeyLongPress = false;
+ 132   3                  gKeyCnt = 0;
+ 133   3              }
+ 134   2          }
+ 135   1          
+ 136   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    244    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =      7       2
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

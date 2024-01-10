@@ -1,0 +1,1 @@
+"..\user\sc7a20.c" OPTIMIZE (8,SPEED) BROWSE INCDIR(..\hal;..\user) DEBUG OBJECTEXTEND PRINT(.\Listings\sc7a20.lst) TABS (2) OBJECT(.\Objects\sc7a20.obj)

@@ -1,0 +1,77 @@
+C51 COMPILER V9.55   CLOCK                                                                 01/10/2024 01:05:56 PAGE 1   
+
+
+C51 COMPILER V9.55, COMPILATION OF MODULE CLOCK
+OBJECT MODULE PLACED IN .\Objects\clock.obj
+COMPILER INVOKED BY: D:\Program Files (x86)\Keil_C51\C51\BIN\C51.EXE ..\hal\clock.c OPTIMIZE(8,SPEED) BROWSE INCDIR(..\h
+                    -al;..\user) DEBUG OBJECTEXTEND PRINT(.\Listings\clock.lst) TABS(2) OBJECT(.\Objects\clock.obj)
+
+line level    source
+
+   1          //#define ALLOCATE_EXTERN
+   2          #include "HC89S003AF4.h"
+   3          #include "clock.h"
+   4          
+   5          /*
+   6           * 功能：使能时钟
+   7           * 输入参数：CLK_EN_EXTERN(开启外部时钟)、CLK_EN_INTERNAL(开启内部RC)
+   8           */
+   9          void clock_enable(clkcon_t clk)
+  10          {
+  11   1          CLKCON = clk;    
+  12   1      }
+  13          
+  14          /*
+  15           * 功能：选择时钟源
+  16           * 输入参数：CLKSEL_INTERNEL_LOW_RC-内部低频RC-44K
+  17           *          CLKSEL_INTERNEL_HIGH_RC-内部高频RC-32M
+  18           *          CLKSEL_EXTERNEL_LOW_OSC-外部时钟
+  19           *          CLKSEL_EXTERNEL_HIGH_OSC-外部时钟
+  20           */
+  21          void clock_set_source(clksel_t rc)
+  22          {
+  23   1          CLKSWR &= (~CLKSEL_MASK);
+  24   1          CLKSWR |= rc; 
+  25   1      }
+  26          
+  27          /*
+  28           * 功能：设置RC32M分频功能（Fosc）
+  29           * 输入参数：RC32M_CLK   - 32M
+  30           *          RC32M_CLK_2 - 16M
+  31           *          RC32M_CLK_4 - 8M
+  32           *          RC32M_CLK_8 - 4M
+  33           */
+  34          void clock_set_rc32m_div(rc32m_div_t div)
+  35          {
+  36   1          CLKSWR &= (~RC32M_CLK_MASK);
+  37   1          CLKSWR |= div;    
+  38   1      }
+  39          
+  40          /*
+  41           * 功能：设置Fcpu
+  42           * 输入参数：0 - Fosc
+  43           *          1 - Fosc
+  44           *          2 - Fosc / 2
+  45           *          ......
+  46           *          255 - Fosc / 255
+  47           */
+  48          void clock_set_cpu_div(uint8_t div)
+  49          {
+  50   1          CLKDIV = div;
+  51   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+C51 COMPILER V9.55   CLOCK                                                                 01/10/2024 01:05:56 PAGE 2   
+
+   CODE SIZE        =     23    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

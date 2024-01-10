@@ -1,0 +1,1 @@
+"..\hal\ie.c" OPTIMIZE (8,SPEED) BROWSE INCDIR(..\hal;..\user) DEBUG OBJECTEXTEND PRINT(.\Listings\ie.lst) TABS (2) OBJECT(.\Objects\ie.obj)

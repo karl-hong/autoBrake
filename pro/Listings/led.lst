@@ -1,0 +1,88 @@
+C51 COMPILER V9.55   LED                                                                   01/10/2024 01:05:56 PAGE 1   
+
+
+C51 COMPILER V9.55, COMPILATION OF MODULE LED
+OBJECT MODULE PLACED IN .\Objects\led.obj
+COMPILER INVOKED BY: D:\Program Files (x86)\Keil_C51\C51\BIN\C51.EXE ..\user\led.c OPTIMIZE(8,SPEED) BROWSE INCDIR(..\ha
+                    -l;..\user) DEBUG OBJECTEXTEND PRINT(.\Listings\led.lst) TABS(2) OBJECT(.\Objects\led.obj)
+
+line level    source
+
+   1          #include "HC89S003AF4.h"
+   2          #include "led.h"
+   3          #include "gpio.h"
+   4          
+   5          void led_init(void)
+   6          {
+   7   1          /* pwm: p0.4*/
+   8   1          gpio0_init(GPIO_4, GPIO_OUTPUT_PP);
+   9   1          PWM3_MAP = 0x04;
+  10   1          PWM3P = 0xff;
+  11   1          PWM3D = 0x00;
+  12   1          PWM3C = 0x92;
+  13   1      
+  14   1          /* 蓝色指示灯：P0.0 */
+  15   1          gpio0_init(GPIO_0, GPIO_OUTPUT_PP);
+  16   1          P0_0 = 1;
+  17   1      
+  18   1          /* 红色指示灯: P1.0 */
+  19   1          gpio1_init(GPIO_0, GPIO_OUTPUT_PP);
+  20   1          P1_0 = 1;
+  21   1      }
+  22          
+  23          void user_set_brake_led_level(led_levet_t level)
+  24          {
+  25   1          switch(level){
+  26   2              case LED_LEVEL_OFF:{
+  27   3                  PWM3D = 0x00;
+  28   3                  break;
+  29   3              }
+  30   2      
+  31   2              case LED_LEVEL_LOW:{
+  32   3                  PWM3D = 0x10;
+  33   3                  break;
+  34   3              }
+  35   2      
+  36   2              case LED_LEVEL_HIGH:{
+  37   3                  PWM3D = 0x55;
+  38   3                  break;
+  39   3              }
+  40   2      
+  41   2              default:
+  42   2                  break;
+  43   2          }
+  44   1      }
+  45          
+  46          void user_set_blue_led_state(led_state_t state)
+  47          {
+  48   1          if(LED_STATE_OFF == state){
+  49   2              P0_0 = 1;
+  50   2          }else{
+  51   2              P0_0 = 0;
+  52   2          }
+  53   1      }
+  54          
+C51 COMPILER V9.55   LED                                                                   01/10/2024 01:05:56 PAGE 2   
+
+  55          void user_set_red_led_state(led_state_t state)
+  56          {
+  57   1          if(LED_STATE_OFF == state){
+  58   2              P1_0 = 1;
+  59   2          }else{
+  60   2              P1_0 = 0;
+  61   2          }
+  62   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =     81    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

@@ -1,0 +1,1 @@
+"..\hal\clock.c" OPTIMIZE (8,SPEED) BROWSE INCDIR(..\hal;..\user) DEBUG OBJECTEXTEND PRINT(.\Listings\clock.lst) TABS (2) OBJECT(.\Objects\clock.obj)
