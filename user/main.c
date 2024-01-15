@@ -10,8 +10,9 @@
 #include "common.h"
 #include "key.h"
 #include "bat.h"
+#include "sc7a20.h"
 
-uint16_t cnt = 0;
+
 main_context_t gMainContext;
 
 void Delay_ms(unsigned int fui_i);
@@ -19,34 +20,36 @@ void timer0_init(void);
 
 void main(void)
 {
-     char test = 0;
 	WDTCCR = 0x00;						//关闭看门狗
-     /* init clock */
-     clock_enable(CLK_EN_INTERNAL);
-     clock_set_source(CLKSEL_INTERNEL_HIGH_RC);
-     clock_set_rc32m_div(RC32M_CLK_2);//Fosc = 16M
-     clock_set_cpu_div(1);//Fcpu = Fosc，由于串口需要Fosc = Fcpu
+	/* init clock */
+	clock_enable(CLK_EN_INTERNAL);
+	clock_set_source(CLKSEL_INTERNEL_HIGH_RC);
+	clock_set_rc32m_div(RC32M_CLK_2);//Fosc = 16M
+	clock_set_cpu_div(1);//Fcpu = Fosc，由于串口需要Fosc = Fcpu
 
-     /* init uart1 */
-     UART1_Init();
-     /* led init */
-     led_init();
-     /* timer init */
-     timer0_init();
-     /* key init */
-     key_init();
-     /* check bat init */
-     bat_init();
+	/* init uart1 */
+	UART1_Init();
+	/* led init */
+	led_init();
+	/* timer init */
+	timer0_init();
+	/* key init */
+	key_init();
+	/* check bat init */
+	bat_init();
+	/* sc7a20 init */
+	sc7a20_gpio_init();
+	sc7a20_init();
 
-     /* enable interrupt */
-     user_set_interrupt_state(IE_TYPE_GLOBAL, IE_ENABLE);
-
-     while(1){
-          // // key_task();
-          check_bat_task();
-          bat_led_task();
-     }
-
+	/* enable interrupt */
+	user_set_interrupt_state(IE_TYPE_GLOBAL, IE_ENABLE);
+		 
+	while(1){
+		key_task();
+		check_bat_task();
+		bat_led_task();
+		sc7a20_task();
+	}
 }
 
 
@@ -85,7 +88,8 @@ void timer0_init(void)
 ***************************************************************************************/
 void TIMER0_Rpt(void) interrupt TIMER0_VECTOR
 { /* 1ms */
-	gMainContext.mKeyDelay = true;
-     gMainContext.mBatDelay = true;
-     gMainContext.mLedDelay = true;
+	 gMainContext.mKeyDelay = true;
+	 gMainContext.mBatDelay = true;
+	 gMainContext.mLedDelay = true;
+	 gMainContext.mSc7a20Delay = true;
 }

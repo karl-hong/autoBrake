@@ -1,4 +1,4 @@
-C51 COMPILER V9.55   GPIO                                                                  01/10/2024 01:05:56 PAGE 1   
+C51 COMPILER V9.55   GPIO                                                                  01/14/2024 03:27:23 PAGE 1   
 
 
 C51 COMPILER V9.55, COMPILATION OF MODULE GPIO
@@ -16,13 +16,13 @@ line level    source
    6          {
    7   1          switch(gpiox){
    8   2              case GPIO_0:P0M0 = P0M0 & 0xF0 | type;break;
-   9   2              case GPIO_1:P0M0 = P0M0 & 0x0F | type;break;
+   9   2              case GPIO_1:P0M0 = P0M0 & 0x0F | (type << 4);break;
   10   2              case GPIO_2:P0M1 = P0M1 & 0xF0 | type;break;
-  11   2              case GPIO_3:P0M1 = P0M1 & 0x0F | type;break;
+  11   2              case GPIO_3:P0M1 = P0M1 & 0x0F | (type << 4);break;
   12   2              case GPIO_4:P0M2 = P0M2 & 0xF0 | type;break;
-  13   2              case GPIO_5:P0M2 = P0M2 & 0x0F | type;break;
+  13   2              case GPIO_5:P0M2 = P0M2 & 0x0F | (type << 4);break;
   14   2              case GPIO_6:P0M3 = P0M3 & 0xF0 | type;break;
-  15   2              case GPIO_7:P0M3 = P0M3 & 0x0F | type;break;
+  15   2              case GPIO_7:P0M3 = P0M3 & 0x0F | (type << 4);break;
   16   2              default:break;
   17   2          }
   18   1      }
@@ -31,7 +31,7 @@ line level    source
   21          {
   22   1          switch(gpiox){
   23   2              case GPIO_0:P1M0 = P1M0 & 0xF0 | type;break;
-  24   2              case GPIO_1:P1M0 = P1M0 & 0x0F | type;break;
+  24   2              case GPIO_1:P1M0 = P1M0 & 0x0F | (type << 4);break;
   25   2              default:break;
   26   2          }
   27   1      }
@@ -40,20 +40,20 @@ line level    source
   30          {
   31   1          switch(gpiox){
   32   2              case GPIO_0:P2M0 = P2M0 & 0xF0 | type;break;
-  33   2              case GPIO_1:P2M0 = P2M0 & 0x0F | type;break;
+  33   2              case GPIO_1:P2M0 = P2M0 & 0x0F | (type << 4);break;
   34   2              case GPIO_2:P2M1 = P2M1 & 0xF0 | type;break;
-  35   2              case GPIO_3:P2M1 = P2M1 & 0x0F | type;break;
+  35   2              case GPIO_3:P2M1 = P2M1 & 0x0F | (type << 4);break;
   36   2              case GPIO_4:P2M2 = P2M2 & 0xF0 | type;break;
-  37   2              case GPIO_5:P2M2 = P2M2 & 0x0F | type;break;
+  37   2              case GPIO_5:P2M2 = P2M2 & 0x0F | (type << 4);break;
   38   2              case GPIO_6:P2M3 = P2M3 & 0xF0 | type;break;
-  39   2              case GPIO_7:P2M3 = P2M3 & 0x0F | type;break;
+  39   2              case GPIO_7:P2M3 = P2M3 & 0x0F | (type << 4);break;
   40   2              default:break;
   41   2          }
   42   1      }
 
 
 MODULE INFORMATION:   STATIC OVERLAYABLE
-   CODE SIZE        =    195    ----
+   CODE SIZE        =    240    ----
    CONSTANT SIZE    =   ----    ----
    XDATA SIZE       =   ----    ----
    PDATA SIZE       =   ----    ----

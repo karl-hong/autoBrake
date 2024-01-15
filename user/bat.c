@@ -60,7 +60,7 @@ void Delay_2us(unsigned int fui_i)
 
 void bat_init(void)
 {
-    BORC = 0xC2;						              //BOR使能，BOR消抖使能，检测电压点2.4V
+    BORC = 0xC0;						              //BOR使能，BOR消抖使能，检测电压点1.8V
 	//BOR消抖时间计算
 	//消抖时间 = BORDBC[7:0] * 8Tcpu + 2Tcpu
 	//		   = 255 * 8 * 0.0625us + 2 * 0.0625us

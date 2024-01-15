@@ -6,7 +6,7 @@
 
 void UART1_Init(void)
 {
-    // /* 设置P2.4为推挽输出 */
+    /* 设置P2.4为推挽输出 */
     P2M2 = P2M2 & 0xF0 | 0x08;
     /* 映射TXD 为P24 */
     TXD_MAP = 0x24;
@@ -14,9 +14,9 @@ void UART1_Init(void)
     /* UART1的波特率: 00 T4 */
     BRTSEL = 0x00;
 
-    // P2M0 = P2M0&0x0F|0x80;				      //P21设置为推挽输出
-	// TXD_MAP = 0x21;						          //TXD映射P21
-	// BRTSEL = 0X00;                                //UART1的波特率:00 T4	
+//    P2M0 = P2M0&0x0F|0x80;				      //P21设置为推挽输出
+//		TXD_MAP = 0x21;						          //TXD映射P21
+//		BRTSEL = 0X00;                      //UART1的波特率:00 T4	
 
 
     /* T4工作模式：UART1波特率发生器 */

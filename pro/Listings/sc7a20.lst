@@ -1,4 +1,4 @@
-C51 COMPILER V9.55   SC7A20                                                                01/03/2024 22:55:53 PAGE 1   
+C51 COMPILER V9.55   SC7A20                                                                01/15/2024 23:18:32 PAGE 1   
 
 
 C51 COMPILER V9.55, COMPILATION OF MODULE SC7A20
@@ -8,17 +8,642 @@ COMPILER INVOKED BY: D:\Program Files (x86)\Keil_C51\C51\BIN\C51.EXE ..\user\sc7
 
 line level    source
 
+   1          #include "sc7a20.h"
+   2          #include "HC89S003AF4.h"
+   3          #include "my_printf.h"
+   4          #include "common.h"
+   5          
+   6          
+   7          uint16_t sc7a20_odr_value[]={
+   8          1,3,5,10,20,40,100,1000,
+   9          };
+  10          
+  11          uint8_t sc7a20_odr_mask[]={
+  12            ODR1250,
+  13            ODR400,
+  14            ODR200,
+  15            ODR100,
+  16            ODR50,
+  17            ODR25,
+  18            ODR10,
+  19            ODR1,
+  20          };
+  21          
+  22          // struct sc7a20_data sc7a20_misc_data;
+  23          static uint16_t xyzBuf[3] = {0};
+  24          static bool_en gSc7a20Init;
+  25          static uchar gPollInterval;
+  26          static uchar gMinInterval;
+  27          static uchar gSensitivity;
+  28          static uchar gShift;
+  29          static uchar gCtrlReg1;
+  30          static uchar gRange;
+  31          static uchar gBdu;
+  32          static uchar gBle;
+  33          static uchar gHr;
+  34          static uint8_t  gResumeState[RESUME_ENTRIES];
+  35          static uint16_t gSensorData[3] = {0};
+  36          static uint8_t  acc_data[6];
+  37          
+  38          
+  39          void sc7a20_gpio_init(void)
+  40          {
+  41   1          P0M2 = P0M2&0x0F|0x80;        //P05设置为推挽输出
+  42   1          P0M3 = P0M3&0x0F|0x40;         //P07带SMT输入
+  43   1          P2M0 = P2M0&0xF0|0x08;         //P20推挽输出
+  44   1          P0M3 = P0M3&0xF0|0x08;    //P06设置为推挽输出
+  45   1          SS_MAP = 0x05;
+  46   1          MISO_MAP = 0x07;               //SPI_MISO 映射到P07口
+  47   1          MOSI_MAP = 0x20;               //SPI_MOSI 映射到P20口
+  48   1          SCK_MAP = 0x06;                //SPI_SCK  映射到P06口
+  49   1          SPDAT = 0x00;                  //数据寄存器写0
+  50   1          SPSTAT = 0x00;                 //状态寄存器清0           
+  51   1          SPCTL = 0xDF;//0xD7;                  //主机模式，时钟128分频
+  52   1          //SPCTL = 0xD7;                  //主机模式，时钟128分频
+  53   1          P0_5 = 0x01;
+  54   1      }
+C51 COMPILER V9.55   SC7A20                                                                01/15/2024 23:18:32 PAGE 2   
+
+  55          
+  56          /**
+  57            * @说明   SPI写读函数
+  58            * @参数   fuc_Data ：SPI读写数据
+  59            * @返回值 SPDAT : SPI读取数据
+  60            * @注      无
+  61            */
+  62          unsigned char SPI_WriteReadData(unsigned char fuc_Data)
+  63          {
+  64   1        SPSTAT = 0xC0;
+  65   1        SPDAT = fuc_Data;
+  66   1        while(!(SPSTAT&0x80));
+  67   1        SPSTAT = 0xC0;
+  68   1        return SPDAT;
+  69   1      }
+  70          
+  71          void delayUs(unsigned int fus)
+  72          {
+  73   1        unsigned int fui_j;
+  74   1        for (; fus > 0; fus--);
+  75   1          for (fui_j = 2; fui_j > 0; fui_j--);
+  76   1      }
+  77          
+  78          int sc7a20_spi_write(uint8_t regAddr, uint8_t *buf, uint16_t len)
+*** WARNING C258 IN LINE 78 OF ..\user\sc7a20.c: 'buf': mspace on parameter ignored
+  79          {
+  80   1        uint16_t length = 0;
+  81   1        uint8_t addr = 0;
+  82   1        P0_5 = 0;
+  83   1        /* write addr */
+  84   1        addr = regAddr & 0x3F;
+  85   1        if(len > 1) addr |= SPI_AUTO_INCREMENT;
+  86   1        SPI_WriteReadData(addr);
+  87   1        
+  88   1        /* write data */
+  89   1        while(length < len && len > 0){
+  90   2          delayUs(10);
+  91   2          SPI_WriteReadData(buf[length]);
+  92   2          length ++;
+  93   2        } 
+  94   1        
+  95   1        P0_5 = 1;
+  96   1      
+  97   1        return 0;
+  98   1      }
+  99          
+ 100          int sc7a20_spi_read(uint8_t regAddr, uint8_t *buf, uint16_t len)
+*** WARNING C258 IN LINE 100 OF ..\user\sc7a20.c: 'buf': mspace on parameter ignored
+ 101          {
+ 102   1        uint16_t length = 0;
+ 103   1        uint8_t addr = 0;
+ 104   1        P0_5 = 0;
+ 105   1        /* write addr */
+ 106   1        addr = regAddr | SPI_READ_FLAG;
+ 107   1        if(len > 1) addr |= SPI_AUTO_INCREMENT;
+ 108   1        SPI_WriteReadData(addr);
+ 109   1       
+ 110   1        /* read data */
+ 111   1        while(length < len && len > 0){
+ 112   2          delayUs(10);
+ 113   2          buf[length] = SPI_WriteReadData(0xff);
+ 114   2          length ++;
+C51 COMPILER V9.55   SC7A20                                                                01/15/2024 23:18:32 PAGE 3   
+
+ 115   2        } 
+ 116   1        
+ 117   1        P0_5 = 1;
+ 118   1      
+ 119   1        return 0;
+ 120   1      }
+ 121          
+ 122          static int sc7a20_write_reg(uint8_t addr, uint8_t value)
+ 123          {
+ 124   1          uint8_t writeValue = value;
+ 125   1          return sc7a20_spi_write(addr, &writeValue, 1);
+ 126   1      }
+ 127          
+ 128          static int sc7a20_read_reg(uint8_t addr, uint8_t *value)
+*** WARNING C258 IN LINE 128 OF ..\user\sc7a20.c: 'value': mspace on parameter ignored
+ 129          { 
+ 130   1        uint8_t readValue = 0;
+ 131   1        sc7a20_spi_read(addr, &readValue, 1);
+ 132   1        *value = readValue;
+ 133   1        
+ 134   1        return 0;
+ 135   1      }
+ 136          
+ 137          static int sc7a20_update_g_range(uint8_t new_g_range)
+ 138          {
+ 139   1        uint8_t sensitivity;
+ 140   1        uint8_t updated_val;
+ 141   1        uint8_t init_val;
+ 142   1        uint8_t new_val;
+ 143   1        uint8_t readValue;
+ 144   1        uint8_t mask = SC7A20_ACC_FS_MASK;
+ 145   1      
+ 146   1        switch (new_g_range) {
+ 147   2          case SC7A20_ACC_G_2G:
+ 148   2            sensitivity = 4;
+ 149   2            break;
+ 150   2          case SC7A20_ACC_G_4G:
+ 151   2            sensitivity = 3;
+ 152   2            break;
+ 153   2          case SC7A20_ACC_G_8G:
+ 154   2            sensitivity = 2;
+ 155   2            break;
+ 156   2          case SC7A20_ACC_G_16G:
+ 157   2            sensitivity = 1;
+ 158   2            break;    
+ 159   2          default:
+ 160   2            my_printf("invalid g range requested: %d\r\n", new_g_range);
+ 161   2            return -1;
+ 162   2        }
+ 163   1        /* read init value */
+ 164   1        sc7a20_read_reg(CTRL_REG4, &init_val);
+ 165   1      
+ 166   1        /* calc new value */
+ 167   1        new_val = new_g_range;
+ 168   1        updated_val = ((mask & new_val) | ((~mask) & init_val));
+ 169   1      
+ 170   1        /* write new value */
+ 171   1        sc7a20_write_reg(CTRL_REG4, updated_val);
+ 172   1        
+ 173   1        /* read out again */
+ 174   1        sc7a20_read_reg(CTRL_REG4, &readValue);
+ 175   1        
+C51 COMPILER V9.55   SC7A20                                                                01/15/2024 23:18:32 PAGE 4   
+
+ 176   1        /* check update result */
+ 177   1        if(updated_val != readValue){
+ 178   2          my_printf("update gsensor range fail\r\n");
+ 179   2          return -1;
+ 180   2        }
+ 181   1           
+ 182   1        gSensitivity = sensitivity;
+ 183   1      
+ 184   1        my_printf("sensitivity %d g-range %d\r\n", sensitivity,new_g_range);
+ 185   1      
+ 186   1        return 0;
+ 187   1      }
+ 188          
+ 189          static int sc7a20_update_bdu(uint8_t new_bdu)
+ 190          {
+ 191   1        uint8_t updated_val;
+ 192   1        uint8_t init_val;
+ 193   1        uint8_t new_val;
+ 194   1        uint8_t readValue;
+ 195   1        uint8_t mask = SC7A20_ACC_BDU_MASK;
+ 196   1      
+ 197   1        /* read init value */
+ 198   1        sc7a20_read_reg(CTRL_REG4, &init_val);
+ 199   1        
+ 200   1        /* calc new value */
+ 201   1        new_val = new_bdu;  
+ 202   1        updated_val = ((mask & new_val) | ((~mask) & init_val));
+ 203   1        
+ 204   1        /* write new value */
+ 205   1        sc7a20_write_reg(CTRL_REG4, updated_val);
+ 206   1        
+ 207   1        /* read out and check again */
+ 208   1        sc7a20_read_reg(CTRL_REG4, &readValue);
+ 209   1        
+ 210   1        if(updated_val != readValue){
+ 211   2          my_printf("update gsensor bdu fail!\r\n");
+ 212   2          return -1;
+ 213   2        }
+ 214   1      
+ 215   1        return 0; 
+ 216   1      }
+ 217          
+ 218          static int sc7a20_update_ble(uint8_t new_ble)
+ 219          {
+ 220   1        uint8_t updated_val;
+ 221   1        uint8_t init_val;
+ 222   1        uint8_t new_val;
+ 223   1        uint8_t mask = SC7A20_ACC_BLE_MASK;
+ 224   1      
+ 225   1        /* read init value */
+ 226   1        sc7a20_read_reg(CTRL_REG4, &init_val);
+ 227   1        
+ 228   1        /* calc new value */
+ 229   1        new_val = new_ble;  
+ 230   1        updated_val = ((mask & new_val) | ((~mask) & init_val));
+ 231   1        
+ 232   1        /* write new value */
+ 233   1        sc7a20_write_reg(CTRL_REG4, updated_val);
+ 234   1        
+ 235   1        /* read out and check again */
+ 236   1        sc7a20_read_reg(CTRL_REG4, &gResumeState[RES_CTRL_REG4]);
+ 237   1      
+C51 COMPILER V9.55   SC7A20                                                                01/15/2024 23:18:32 PAGE 5   
+
+ 238   1        if(updated_val != gResumeState[RES_CTRL_REG4]){
+ 239   2          my_printf("update gsensor ble fail!\r\n");
+ 240   2          return -1;
+ 241   2        }
+ 242   1      
+ 243   1        return 0;
+ 244   1      }
+ 245          
+ 246          static int sc7a20_update_hr(uint8_t new_hr)
+ 247          {
+ 248   1        uint8_t updated_val;
+ 249   1        uint8_t init_val;
+ 250   1        uint8_t new_val;
+ 251   1        uint8_t readValue;
+ 252   1        uint8_t mask = SC7A20_ACC_HR_MASK;
+ 253   1      
+ 254   1        /* read init value */
+ 255   1        sc7a20_read_reg(CTRL_REG4, &init_val);
+ 256   1        
+ 257   1        /* calc new value */
+ 258   1        new_val = new_hr; 
+ 259   1        updated_val = ((mask & new_val) | ((~mask) & init_val));
+ 260   1        
+ 261   1        /* write new value */
+ 262   1        sc7a20_write_reg(CTRL_REG4, updated_val);
+ 263   1        
+ 264   1        /* read out and check again */
+ 265   1        sc7a20_read_reg(CTRL_REG4, &readValue);
+ 266   1        
+ 267   1        if(updated_val != readValue){
+ 268   2          my_printf("update gsensor hr fail!\r\n");
+ 269   2          return -1;
+ 270   2        }
+ 271   1        
+ 272   1        return 0; 
+ 273   1      }
+ 274          
+ 275          static int sc7a20_update_odr(int poll_interval_ms)
+ 276          {
+ 277   1        int err = -1;
+ 278   1        int i;
+ 279   1        uint8_t new_value;
+ 280   1        uint8_t readValue;
+ 281   1        uint16_t table_size =  sizeof(sc7a20_odr_value) / sizeof(uint16_t);
+ 282   1      
+ 283   1        for (i = table_size - 1; i >= 0; i--) {
+ 284   2          if (sc7a20_odr_value[i] <= poll_interval_ms)
+ 285   2            break;
+ 286   2        }
+ 287   1      
+ 288   1        new_value = sc7a20_odr_mask[i];
+ 289   1      
+ 290   1        new_value |= SC7A20_ENABLE_ALL_AXES;
+ 291   1        
+ 292   1        /* write new value */
+ 293   1        sc7a20_write_reg(CTRL_REG1, new_value);
+ 294   1      
+ 295   1        /* read out and check again */
+ 296   1        sc7a20_read_reg(CTRL_REG1, &readValue);
+ 297   1        
+ 298   1        if(new_value != readValue){
+ 299   2          my_printf("update gsensor odr fail!\r\n");
+C51 COMPILER V9.55   SC7A20                                                                01/15/2024 23:18:32 PAGE 6   
+
+ 300   2          return -1;
+ 301   2        }
+ 302   1        
+ 303   1        gCtrlReg1 = new_value;
+ 304   1        return 0;
+ 305   1      }
+ 306          
+ 307          static int sc7a20_update_reg4(uint8_t range, uint8_t bdu, uint8_t ble, uint8_t hr)
+ 308          {
+ 309   1        uint8_t writeValue;
+ 310   1        uint8_t readValue;
+ 311   1        
+ 312   1        writeValue = range | bdu | ble | hr;
+ 313   1        
+ 314   1        /* write new value */
+ 315   1        sc7a20_write_reg(CTRL_REG4, writeValue);
+ 316   1        
+ 317   1        /* read out and check again */
+ 318   1        sc7a20_read_reg(CTRL_REG4, &readValue);
+ 319   1        
+ 320   1        if(writeValue != readValue){
+ 321   2          my_printf("update gsensor hr fail!\r\n");
+ 322   2          return -1;
+ 323   2        }
+ 324   1        
+ 325   1        return 0; 
+ 326   1      }
+ 327          
+ 328          static void sc7a20_set_interrupt(void)
+ 329          {
+ 330   1        uint8_t writeValue;
+ 331   1        uint8_t readValue = 0;
+ 332   1        
+ 333   1        /* High Interrupt Triggler */
+ 334   1        writeValue = 0x00;
+ 335   1        sc7a20_write_reg(CTRL_REG6, writeValue);
+ 336   1        sc7a20_read_reg(CTRL_REG6, &readValue);
+ 337   1        if(readValue != writeValue){
+ 338   2          my_printf("gsensor set interrupt triggler fail!\r\n");
+ 339   2        }
+ 340   1        
+ 341   1        /* Interrup thresold */
+ 342   1        writeValue = 0x50;//0x40;//0x60;//0x50;
+ 343   1        sc7a20_write_reg(CLICK_THS, writeValue);
+ 344   1        sc7a20_read_reg(CLICK_THS, &readValue);
+ 345   1        if(readValue != writeValue){
+ 346   2          my_printf("gsensor set interrupt triggler fail!\r\n");
+ 347   2        }
+ 348   1        
+ 349   1        /* Time limit */
+ 350   1        writeValue = 0x7f;
+ 351   1        sc7a20_write_reg(TIME_LIMIT, writeValue);
+ 352   1        sc7a20_read_reg(TIME_LIMIT, &readValue);
+ 353   1        if(readValue != writeValue){
+ 354   2          my_printf("gsensor set TIME_LIMIT fail!\r\n");
+ 355   2        }
+ 356   1        
+ 357   1        /* Time latency */
+ 358   1        writeValue = 0x05;
+ 359   1        sc7a20_write_reg(TIME_LATENCY, writeValue);
+ 360   1        sc7a20_read_reg(TIME_LATENCY, &readValue);
+ 361   1        if(readValue != writeValue){
+C51 COMPILER V9.55   SC7A20                                                                01/15/2024 23:18:32 PAGE 7   
+
+ 362   2          my_printf("gsensor set TIME_LATENCY fail!\r\n");
+ 363   2        }
+ 364   1        
+ 365   1        /* x/y/z Interrupt Detect Enable */
+ 366   1        writeValue = 0x15;
+ 367   1        sc7a20_write_reg(CLICK_CFG, writeValue);
+ 368   1        sc7a20_read_reg(CLICK_CFG, &readValue);
+ 369   1        if(readValue != writeValue){
+ 370   2          my_printf("gsensor set interrupt detect enable fail!\r\n");
+ 371   2        }
+ 372   1        
+ 373   1        /* enable x/y/z direction interrupt, low event */
+ 374   1        writeValue = 0x15;
+ 375   1        sc7a20_write_reg(INT1_CFG, writeValue); 
+ 376   1        sc7a20_read_reg(INT1_CFG, &readValue);
+ 377   1        if(readValue != writeValue){
+ 378   2          my_printf("gsensor enable direction interrupt event fail!\r\n");
+ 379   2        }
+ 380   1        
+ 381   1        
+ 382   1        /* Enable Interrupt */
+ 383   1        writeValue = 0x80;
+ 384   1        sc7a20_write_reg(CTRL_REG3, writeValue);
+ 385   1        sc7a20_read_reg(CTRL_REG3, &readValue);
+ 386   1        if(readValue != writeValue){
+ 387   2          my_printf("gsensor enable interrupt fail!\r\n");
+ 388   2        }
+ 389   1      }
+ 390          
+ 391          void sc7a20_init(void)
+ 392          {
+ 393   1        uint8_t chipId = 0;
+ 394   1        int rc;
+ 395   1        
+ 396   1        sc7a20_read_reg(WHO_AM_I, &chipId);
+ 397   1        if(SC7A20_CHIP_ID != chipId){
+ 398   2          my_printf("sc7a20 wrong chip id!\r\n");
+ 399   2          return;
+ 400   2        }
+ 401   1        
+ 402   1        gResumeState[RES_CTRL_REG1] = SC7A20_ENABLE_ALL_AXES;
+ 403   1        gResumeState[RES_CTRL_REG2] = 0x00;
+ 404   1        gResumeState[RES_CTRL_REG3] = 0x00;
+ 405   1        gResumeState[RES_CTRL_REG4] = 0x00;
+ 406   1        gResumeState[RES_CTRL_REG5] = 0x00;
+ 407   1        gResumeState[RES_CTRL_REG6] = 0x00;
+ 408   1        
+ 409   1      //  gRange     = SC7A20_ACC_G_2G;
+ 410   1      //  gBdu       = SC7A20_ACC_BDU_MASK;
+ 411   1      //  gBle       = 0x00;//SC7A20_ACC_BLE_MASK;
+ 412   1      //  gHr        = SC7A20_ACC_HR_MASK;
+ 413   1      //  rc = sc7a20_update_reg4(gRange, gBdu, gBle, gHr);
+ 414   1      //  if(0 > rc){
+ 415   1      //    my_printf("update reg4 fail!\r\n");
+ 416   1      //    goto error1;
+ 417   1      //  }
+ 418   1        
+ 419   1        gRange     = SC7A20_ACC_G_2G;
+ 420   1        gSensitivity = SENSITIVITY_2G;
+ 421   1        /* set g range */
+ 422   1        rc = sc7a20_update_g_range(gRange);
+ 423   1        if(0 > rc){
+C51 COMPILER V9.55   SC7A20                                                                01/15/2024 23:18:32 PAGE 8   
+
+ 424   2          my_printf("update_g_range failed\r\n");
+ 425   2          goto error1;
+ 426   2        }
+ 427   1        
+ 428   1        /* set bdu */
+ 429   1        gBdu = 0x80;
+ 430   1        rc = sc7a20_update_bdu(gBdu);
+ 431   1        if(0 > rc){
+ 432   2          my_printf("update_bdu failed\r\n");
+ 433   2          goto error1;
+ 434   2        }
+ 435   1        
+ 436   1        /* set ble */
+ 437   1        gBle = 0x00;
+ 438   1        rc = sc7a20_update_ble(gBle);
+ 439   1        if(0 > rc){
+ 440   2          my_printf("update_ble failed\r\n");
+ 441   2          goto error1;
+ 442   2        }
+ 443   1        
+ 444   1        /* set hr */
+ 445   1        gHr = 0x08;
+ 446   1        rc = sc7a20_update_hr(gHr);
+ 447   1        if(0 > rc){
+ 448   2          my_printf("update_hr failed\r\n");
+ 449   2          goto error1;
+ 450   2        }
+ 451   1        
+ 452   1        /* set odr */
+ 453   1        gMinInterval  = 20;
+ 454   1        gPollInterval = 20;
+ 455   1        rc = sc7a20_update_odr(gPollInterval);
+ 456   1        if(0 > rc){
+ 457   2          my_printf("update_odr failed\r\n");
+ 458   2          goto error1;
+ 459   2        }
+ 460   1        
+ 461   1        sc7a20_set_interrupt();
+ 462   1        
+ 463   1        gSc7a20Init = 1;
+ 464   1        my_printf("sc7a20 hw init done!\r\n");
+ 465   1        
+ 466   1        return;
+ 467   1      error1:
+ 468   1        gSc7a20Init = 0;
+ 469   1        my_printf("sc7a20 init failed\r\n");
+ 470   1        return;
+ 471   1      }
+ 472          
+ 473          static int sc7a20_get_acceleration_data(uint16_t *xyz)
+ 474          {
+ 475   1        static uint16_t errCnt = 0;
+ 476   1        
+ 477   1        int err = -1;
+ 478   1        /* Data bytes from hardware xL, xH, yL, yH, zL, zH */
+ 479   1        int16_t hw_d[3] = { 0 };
+ 480   1        uint8_t readValue = 0;
+ 481   1        
+ 482   1        /* test read api */
+ 483   1        sc7a20_read_reg(WHO_AM_I, &readValue);
+ 484   1        if(SC7A20_CHIP_ID != readValue){
+ 485   2          my_printf("sc7a20 wrong chip id!\r\n");
+C51 COMPILER V9.55   SC7A20                                                                01/15/2024 23:18:32 PAGE 9   
+
+ 486   2          return -1;
+ 487   2        }
+ 488   1        
+ 489   1        /* check status reg */
+ 490   1        sc7a20_read_reg(STATUS_REG, &readValue);
+ 491   1        if((readValue & 0x0f) != 0x0f){
+ 492   2          goto error;
+ 493   2        }
+ 494   1            
+ 495   1        /* read XOUT_L reg */
+ 496   1        sc7a20_read_reg(XOUT_L, &readValue);
+ 497   1        /* get data */
+ 498   1        acc_data[0] = readValue;
+ 499   1        
+ 500   1        /* read XOUT_H reg */
+ 501   1        sc7a20_read_reg(XOUT_H, &readValue);
+ 502   1        /* get data */
+ 503   1        acc_data[1] = readValue;  
+ 504   1      
+ 505   1        /* read YOUT_L reg */
+ 506   1        sc7a20_read_reg(YOUT_L, &readValue);
+ 507   1        /* get data */
+ 508   1        acc_data[2] = readValue;
+ 509   1      
+ 510   1        /* read YOUT_H reg */
+ 511   1        sc7a20_read_reg(YOUT_H, &readValue);
+ 512   1        /* get data */
+ 513   1        acc_data[3] = readValue;
+ 514   1      
+ 515   1        /* read ZOUT_L reg */
+ 516   1        sc7a20_read_reg(ZOUT_L, &readValue);
+ 517   1        /* get data */
+ 518   1        acc_data[4] = readValue;
+ 519   1      
+ 520   1        /* read ZOUT_H  reg */
+ 521   1        sc7a20_read_reg(ZOUT_H, &readValue);
+ 522   1        /* get data */
+ 523   1        acc_data[5] = readValue;
+ 524   1      
+ 525   1        /* get all data */
+ 526   1        hw_d[0] =  ((acc_data[1] << 8) & 0xff00) | acc_data[0];
+ 527   1        hw_d[1] =  ((acc_data[3] << 8) & 0xff00) | acc_data[2];
+ 528   1        hw_d[2] =  ((acc_data[5] << 8) & 0xff00) | acc_data[4];
+ 529   1      
+ 530   1        hw_d[0] = ((int16_t) hw_d[0] ) >> gSensitivity;
+ 531   1        hw_d[1] = ((int16_t) hw_d[1] ) >> gSensitivity;
+ 532   1        hw_d[2] = ((int16_t) hw_d[2] ) >> gSensitivity;
+ 533   1      
+ 534   1        xyz[0] = hw_d[0];
+ 535   1        xyz[1] = hw_d[1];
+ 536   1        xyz[2] = hw_d[2];
+ 537   1      
+ 538   1        xyzBuf[0] = xyz[0];
+ 539   1        xyzBuf[1] = xyz[1];
+ 540   1        xyzBuf[2] = xyz[2];
+ 541   1        
+ 542   1        errCnt = 0;
+ 543   1      
+ 544   1        return 0;
+ 545   1        
+ 546   1      error:
+ 547   1        errCnt ++;
+C51 COMPILER V9.55   SC7A20                                                                01/15/2024 23:18:32 PAGE 10  
+
+ 548   1        if(errCnt >= 6000){
+ 549   2          errCnt = 0;
+ 550   2          /* reinit */
+ 551   2          sc7a20_init();
+ 552   2        }
+ 553   1        
+ 554   1        return -1;
+ 555   1      }
+ 556          
+ 557          void sc7a20_interrupt_handle(void)
+ 558          {
+ 559   1        //Sensor.gSensorState = 1;
+ 560   1        //printf("sc7a20!!!\r\n");
+ 561   1      }
+ 562          
+ 563          
+ 564          void sc7a20_task(void)
+ 565          {
+ 566   1        static uint8_t stTaskCnt = 0;
+ 567   1        if(false == gMainContext.mSc7a20Delay){
+ 568   2          return;
+ 569   2        }
+ 570   1        gMainContext.mSc7a20Delay = false;
+ 571   1        
+ 572   1        stTaskCnt ++;
+ 573   1        if(stTaskCnt < 10){
+ 574   2          return;
+ 575   2        }
+ 576   1        stTaskCnt = 0;
+ 577   1        
+ 578   1        if(0 == gSc7a20Init){
+ 579   2          sc7a20_init();
+ 580   2          return;
+ 581   2        }
+ 582   1        
+ 583   1        if(-1 == sc7a20_get_acceleration_data(gSensorData)){
+ 584   2          return;
+ 585   2        }
+ 586   1      
+ 587   1        my_printf("x: %d, y: %d, z: %d\r\n", gSensorData[0], gSensorData[1], gSensorData[2]);
+ 588   1      }
+ 589          
+ 590          
+ 591          
+ 592          
+ 593          
+ 594          
+ 595          
+ 596          
+ 597          
+ 598          
+ 599          
+ 600          
+ 601          
+ 602          
 
 
 MODULE INFORMATION:   STATIC OVERLAYABLE
-   CODE SIZE        =   ----    ----
-   CONSTANT SIZE    =   ----    ----
-   XDATA SIZE       =   ----    ----
+   CODE SIZE        =   2064    ----
+   CONSTANT SIZE    =    623    ----
+   XDATA SIZE       =     51      38
    PDATA SIZE       =   ----    ----
-   DATA SIZE        =   ----    ----
+C51 COMPILER V9.55   SC7A20                                                                01/15/2024 23:18:32 PAGE 11  
+
+   DATA SIZE        =     10      25
    IDATA SIZE       =   ----    ----
    BIT SIZE         =   ----    ----
 END OF MODULE INFORMATION.
 
 
-C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)
+C51 COMPILATION COMPLETE.  3 WARNING(S),  0 ERROR(S)

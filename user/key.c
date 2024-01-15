@@ -3,6 +3,7 @@
 #include "gpio.h"
 #include "common.h"
 #include "led.h"
+#include "my_printf.h"
 
 #define KEY_MASK        0x00
 #define KEY_VALUE_PWR   0x01
@@ -77,18 +78,21 @@ static void onShortKeyPressed(uint8_t keyValue)
 void key_init(void)
 {
     /* 电源键：P2.5 */
-    gpio2_init(GPIO_5, GPIO_INPUT_PU_WITH_SMT);
-
+//    gpio2_init(GPIO_5, GPIO_INPUT_PU_WITHOUT_SMT);
+	
+		P2M2 = P2M2 & 0X0F | 0X60;
     /* Gsensor 阈值设置键: P0.2 */
     gpio0_init(GPIO_2, GPIO_INPUT_PU_WITHOUT_SMT);
 
     /* Gsensor 滤波时间设置键: P2.3 */
-    gpio2_init(GPIO_3, GPIO_INPUT_PU_WITH_SMT);
+    gpio2_init(GPIO_3, GPIO_INPUT_PU_WITHOUT_SMT);
 }
 
 void key_task(void)
 {
     uint8_t stKeyValue;
+	
+	char value = P2_5;
 
     if(gMainContext.mKeyDelay == false){
         return;
@@ -96,8 +100,11 @@ void key_task(void)
     gMainContext.mKeyDelay = false;
 
     stKeyValue = P2_5;
+		my_printf("p2_5: %d\r\n", P2_5);
 	stKeyValue |= (P0_2 ? 0x02 : 0x00);
 	stKeyValue |= (P2_3 ? 0x04 : 0x00);
+
+    
 
     if(KEY_MASK == stKeyValue){
         /* no key pressed */
